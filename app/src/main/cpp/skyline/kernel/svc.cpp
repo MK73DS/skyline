@@ -771,7 +771,9 @@ namespace skyline::kernel::svc {
             "MOV X1, #0xF800\n\t"
             "MOVK X1, #0x124, lsl #16\n\t"
             "MUL %0, %0, X1\n\t"
-            "MRS X1, CNTFRQ_EL0\n\t"
+            //"MRS X1, CNTFRQ_EL0\n\t"
+            "MOV X1, #0xBA80\n\t"
+            "MOVK X1, #0x18C, lsl #16\n\t"
             "UDIV %0, %0, X1\n\t"
             "LDR X1, [SP], #16" : "=r"(tick));
         state.ctx->gpr.x0 = tick;

@@ -127,8 +127,8 @@ namespace skyline {
          * @return The current time in nanoseconds
          */
         inline u64 GetTimeNs() {
-            u64 frequency;
-            asm("MRS %0, CNTFRQ_EL0" : "=r"(frequency));
+            u64 frequency = 26000000;
+            //asm("MRS %0, CNTFRQ_EL0" : "=r"(frequency));
             u64 ticks;
             asm("MRS %0, CNTVCT_EL0" : "=r"(ticks));
             return ((ticks / frequency) * constant::NsInSecond) + (((ticks % frequency) * constant::NsInSecond + (frequency / 2)) / frequency);
