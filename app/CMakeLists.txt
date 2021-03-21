@@ -17,6 +17,7 @@ if (uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE")
 endif ()
 
 add_subdirectory("libraries/fmt")
+add_subdirectory("libraries/tzcode")
 
 add_subdirectory("libraries/oboe")
 include_directories("libraries/oboe/include")
@@ -39,6 +40,7 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/common.cpp
         ${source_DIR}/skyline/common/settings.cpp
         ${source_DIR}/skyline/common/signal.cpp
+        ${source_DIR}/skyline/common/uuid.cpp
         ${source_DIR}/skyline/nce/guest.S
         ${source_DIR}/skyline/nce.cpp
         ${source_DIR}/skyline/jvm.cpp
@@ -74,11 +76,13 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/loader/nca.cpp
         ${source_DIR}/skyline/loader/xci.cpp
         ${source_DIR}/skyline/loader/nsp.cpp
-        ${source_DIR}/skyline/vfs/os_filesystem.cpp
         ${source_DIR}/skyline/vfs/partition_filesystem.cpp
         ${source_DIR}/skyline/vfs/ctr_encrypted_backing.cpp
         ${source_DIR}/skyline/vfs/rom_filesystem.cpp
+        ${source_DIR}/skyline/vfs/os_filesystem.cpp
         ${source_DIR}/skyline/vfs/os_backing.cpp
+        ${source_DIR}/skyline/vfs/android_asset_filesystem.cpp
+        ${source_DIR}/skyline/vfs/android_asset_backing.cpp
         ${source_DIR}/skyline/vfs/nacp.cpp
         ${source_DIR}/skyline/vfs/npdm.cpp
         ${source_DIR}/skyline/vfs/nca.cpp
@@ -121,10 +125,17 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/hid/IHidServer.cpp
         ${source_DIR}/skyline/services/hid/IAppletResource.cpp
         ${source_DIR}/skyline/services/hid/IActiveVibrationDeviceList.cpp
+        ${source_DIR}/skyline/services/timesrv/common.cpp
+        ${source_DIR}/skyline/services/timesrv/core.cpp
+        ${source_DIR}/skyline/services/timesrv/time_shared_memory.cpp
+        ${source_DIR}/skyline/services/timesrv/timezone_manager.cpp
+        ${source_DIR}/skyline/services/timesrv/time_manager_server.cpp
         ${source_DIR}/skyline/services/timesrv/IStaticService.cpp
         ${source_DIR}/skyline/services/timesrv/ISystemClock.cpp
         ${source_DIR}/skyline/services/timesrv/ISteadyClock.cpp
         ${source_DIR}/skyline/services/timesrv/ITimeZoneService.cpp
+        ${source_DIR}/skyline/services/glue/IStaticService.cpp
+        ${source_DIR}/skyline/services/glue/ITimeZoneService.cpp
         ${source_DIR}/skyline/services/fssrv/IFileSystemProxy.cpp
         ${source_DIR}/skyline/services/fssrv/IFileSystem.cpp
         ${source_DIR}/skyline/services/fssrv/IFile.cpp
@@ -169,5 +180,5 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/prepo/IPrepoService.cpp
         )
 # target_precompile_headers(skyline PRIVATE ${source_DIR}/skyline/common.h) # PCH will currently break Intellisense
-target_link_libraries(skyline vulkan android fmt lz4_static oboe mbedtls::mbedcrypto)
+target_link_libraries(skyline vulkan android fmt lz4_static tzcode oboe mbedtls::mbedcrypto)
 target_compile_options(skyline PRIVATE -Wall -Wno-unknown-attributes -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c99-designator -Wno-reorder -Wno-missing-braces -Wno-unused-variable -Wno-unused-private-field)

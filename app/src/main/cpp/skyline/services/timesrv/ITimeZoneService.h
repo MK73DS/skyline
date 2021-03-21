@@ -6,49 +6,69 @@
 #include <services/serviceman.h>
 
 namespace skyline::service::timesrv {
+    namespace core {
+        struct TimeServiceObject;
+    }
+
     /**
-     * @brief ITimeZoneService is used to retrieve and set time
+     * @brief ITimeZoneService is used to retrieve and set timezone info and convert between times and dates by the system
      * @url https://switchbrew.org/wiki/PSC_services#ITimeZoneService
      */
     class ITimeZoneService : public BaseService {
       private:
-        /**
-         * @brief A particular time point in Nintendo's calendar format
-         */
-        struct CalendarTime {
-            u16 year; //!< Amount of years that have passed since 1900
-            u8 month; //!< Month of the year (1-12) [POSIX time uses 0-11]
-            u8 day; //!< Day of the month (1-31)
-            u8 hour; //!< Hour of the day (0-23)
-            u8 minute; //!< Minute of the hour (0-59)
-            u8 second; //!< Second of the minute (0-60)
-            u8 _pad_;
-        };
-        static_assert(sizeof(CalendarTime) == 0x8);
-
-        /**
-         * @brief Additional metadata about the time alongside CalendarTime
-         */
-        struct CalendarAdditionalInfo {
-            u32 dayWeek; //!< Amount of days since Sunday
-            u32 dayMonth; //!< Amount of days since the start of the month
-            u64 tzName; //!< The name of the time zone
-            i32 dst; //!< If DST is in effect or not
-            u32 utcRel; //!< Offset of the time from GMT in seconds
-        };
-        static_assert(sizeof(CalendarAdditionalInfo) == 0x18);
+        core::TimeServiceObject &core;
+        bool writeable; //!< If this instance is allowed to set the device timezone
 
       public:
-        ITimeZoneService(const DeviceState &state, ServiceManager &manager);
+        ITimeZoneService(const DeviceState &state, ServiceManager &manager, core::TimeServiceObject &core, bool writeable);
 
-        /**
-         * @brief Receives a u64 #PosixTime (https://switchbrew.org/wiki/PSC_services#PosixTime), and returns a #CalendarTime (https://switchbrew.org/wiki/PSC_services#CalendarTime), #CalendarAdditionalInfo
-         * @url https://switchbrew.org/wiki/PSC_services#CalendarAdditionalInfo
-         */
+        Result GetDeviceLocationName(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result SetDeviceLocationName(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result GetTotalLocationNameCount(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result LoadLocationNameList(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result LoadTimeZoneRule(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result GetTimeZoneRuleVersion(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result GetDeviceLocationNameAndUpdatedTime(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result SetDeviceLocationNameWithTimeZoneBinaryIpc(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result SetDeviceLocationNameWithTimeZoneBinary(std::string_view locationName, span<u8> rule);
+
+        Result ParseTimeZoneBinaryIpc(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result ParseTimeZoneBinary(span<u8> binary, span<u8> rule);
+
+        Result GetDeviceLocationNameOperationEventReadableHandle(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result ToCalendarTime(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
         Result ToCalendarTimeWithMyRule(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
 
+        Result ToPosixTime(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        Result ToPosixTimeWithMyRule(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
         SERVICE_DECL(
-            SFUNC(0x65, ITimeZoneService, ToCalendarTimeWithMyRule)
+            SFUNC(0x0, ITimeZoneService, GetDeviceLocationName),
+            SFUNC(0x1, ITimeZoneService, SetDeviceLocationName),
+            SFUNC(0x2, ITimeZoneService, GetTotalLocationNameCount),
+            SFUNC(0x3, ITimeZoneService, LoadLocationNameList),
+            SFUNC(0x4, ITimeZoneService, LoadTimeZoneRule),
+            SFUNC(0x5, ITimeZoneService, GetTimeZoneRuleVersion),
+            SFUNC(0x6, ITimeZoneService, GetDeviceLocationNameAndUpdatedTime),
+            SFUNC(0x7, ITimeZoneService, SetDeviceLocationNameWithTimeZoneBinaryIpc),
+            SFUNC(0x8, ITimeZoneService, ParseTimeZoneBinaryIpc),
+            SFUNC(0x9, ITimeZoneService, GetDeviceLocationNameOperationEventReadableHandle),
+            SFUNC(0x64, ITimeZoneService, ToCalendarTime),
+            SFUNC(0x65, ITimeZoneService, ToCalendarTimeWithMyRule),
+            SFUNC(0xC9, ITimeZoneService, ToPosixTime),
+            SFUNC(0xCA, ITimeZoneService, ToPosixTimeWithMyRule)
         )
     };
 }

@@ -71,12 +71,50 @@ namespace skyline {
         /**
          * @note Success is 0, it's the only result that's not specific to a module
          */
-        Result() = default;
+        constexpr Result() = default;
 
-        constexpr Result(u16 module, u16 id) : module(module), id(id) {}
+        constexpr explicit Result(u16 module, u16 id) : module(module), id(id) {}
 
         constexpr operator u32() const {
             return raw;
+        }
+    };
+
+    /**
+     * @brief A wrapper around std::optional that also stores a HOS result code
+     * @tparam T The object type to hold
+     */
+    template<typename T>
+    class ResultValue {
+        static_assert(!std::is_same<T, Result>::value);
+
+      private:
+        std::optional<T> value;
+
+      public:
+        Result result;
+
+        constexpr ResultValue(T value) : value(value) {};
+
+        constexpr ResultValue(Result result) : result(result) {};
+
+        template<typename U>
+        constexpr ResultValue(ResultValue<U> result) : result(result) {};
+
+        constexpr operator Result() const {
+            return result;
+        }
+
+        explicit constexpr operator bool() const {
+            return value.has_value();
+        }
+
+        constexpr T& operator*()  {
+            return *value;
+        }
+
+        constexpr T* operator->()  {
+            return &*value;
         }
     };
 
@@ -88,6 +126,7 @@ namespace skyline {
         constexpr u16 DockedResolutionH{1080}; //!< The height component of the docked resolution
         // Time
         constexpr u64 NsInSecond{1000000000}; //!< The amount of nanoseconds in a second
+        constexpr u64 NsInDay{86400000000000UL}; //!< The amount of nanoseconds in a day
     }
 
     namespace util {
@@ -271,6 +310,24 @@ namespace skyline {
                     break;
             }
             return result >> (offset + 4);
+        }
+
+        template<size_t N>
+        constexpr std::array<u8, N> SwapEndianness(std::array<u8, N> in) {
+            std::reverse(in.begin(), in.end());
+            return in;
+        }
+
+        constexpr u64 SwapEndianness(u64 in) {
+            return __builtin_bswap64(in);
+        }
+
+        constexpr u32 SwapEndianness(u32 in) {
+            return __builtin_bswap32(in);
+        }
+
+        constexpr u16 SwapEndianness(u16 in) {
+            return __builtin_bswap16(in);
         }
 
         /**
