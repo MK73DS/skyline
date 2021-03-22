@@ -3,6 +3,7 @@
 
 #include <os.h>
 #include <kernel/types/KProcess.h>
+#include <common/trace.h>
 #include <vfs/npdm.h>
 #include "results.h"
 #include "svc.h"
@@ -15,7 +16,7 @@ namespace skyline::kernel::svc {
             state.ctx->gpr.w0 = result::InvalidSize;
             state.ctx->gpr.x1 = 0;
 
-            state.logger->Warn("svcSetHeapSize: 'size' not divisible by 2MB: {}", size);
+            state.logger->Warn("'size' not divisible by 2MB: {}", size);
             return;
         }
 
@@ -25,21 +26,21 @@ namespace skyline::kernel::svc {
         state.ctx->gpr.w0 = Result{};
         state.ctx->gpr.x1 = reinterpret_cast<u64>(heap->ptr);
 
-        state.logger->Debug("svcSetHeapSize: Allocated at 0x{:X} - 0x{:X} (0x{:X} bytes)", heap->ptr, heap->ptr + heap->size, heap->size);
+        state.logger->Debug("Allocated at 0x{:X} - 0x{:X} (0x{:X} bytes)", heap->ptr, heap->ptr + heap->size, heap->size);
     }
 
     void SetMemoryAttribute(const DeviceState &state) {
         auto pointer{reinterpret_cast<u8 *>(state.ctx->gpr.x0)};
         if (!util::PageAligned(pointer)) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcSetMemoryAttribute: 'pointer' not page aligned: 0x{:X}", pointer);
+            state.logger->Warn("'pointer' not page aligned: 0x{:X}", pointer);
             return;
         }
 
         size_t size{state.ctx->gpr.x1};
         if (!util::PageAligned(size)) {
             state.ctx->gpr.w0 = result::InvalidSize;
-            state.logger->Warn("svcSetMemoryAttribute: 'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
+            state.logger->Warn("'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
             return;
         }
 
@@ -49,20 +50,20 @@ namespace skyline::kernel::svc {
         auto maskedValue{mask.value | value.value};
         if (maskedValue != mask.value || !mask.isUncached || mask.isDeviceShared || mask.isBorrowed || mask.isIpcLocked) {
             state.ctx->gpr.w0 = result::InvalidCombination;
-            state.logger->Warn("svcSetMemoryAttribute: 'mask' invalid: 0x{:X}, 0x{:X}", mask.value, value.value);
+            state.logger->Warn("'mask' invalid: 0x{:X}, 0x{:X}", mask.value, value.value);
             return;
         }
 
         auto chunk{state.process->memory.Get(pointer)};
         if (!chunk) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcSetMemoryAttribute: Cannot find memory region: 0x{:X}", pointer);
+            state.logger->Warn("Cannot find memory region: 0x{:X}", pointer);
             return;
         }
 
         if (!chunk->state.attributeChangeAllowed) {
             state.ctx->gpr.w0 = result::InvalidState;
-            state.logger->Warn("svcSetMemoryAttribute: Attribute change not allowed for chunk: 0x{:X}", pointer);
+            state.logger->Warn("Attribute change not allowed for chunk: 0x{:X}", pointer);
             return;
         }
 
@@ -72,7 +73,7 @@ namespace skyline::kernel::svc {
         newChunk.attributes.isUncached = value.isUncached;
         state.process->memory.InsertChunk(newChunk);
 
-        state.logger->Debug("svcSetMemoryAttribute: Set CPU caching to {} at 0x{:X} - 0x{:X} (0x{:X} bytes)", !static_cast<bool>(value.isUncached), pointer, pointer + size, size);
+        state.logger->Debug("Set CPU caching to {} at 0x{:X} - 0x{:X} (0x{:X} bytes)", !static_cast<bool>(value.isUncached), pointer, pointer + size, size);
         state.ctx->gpr.w0 = Result{};
     }
 
@@ -83,32 +84,32 @@ namespace skyline::kernel::svc {
 
         if (!util::PageAligned(destination) || !util::PageAligned(source)) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcMapMemory: Addresses not page aligned: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Addresses not page aligned: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
 
         if (!util::PageAligned(size)) {
             state.ctx->gpr.w0 = result::InvalidSize;
-            state.logger->Warn("svcMapMemory: 'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
+            state.logger->Warn("'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
             return;
         }
 
         auto stack{state.process->memory.stack};
         if (!stack.IsInside(destination)) {
             state.ctx->gpr.w0 = result::InvalidMemoryRegion;
-            state.logger->Warn("svcMapMemory: Destination not within stack region: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Destination not within stack region: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
 
         auto chunk{state.process->memory.Get(source)};
         if (!chunk) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcMapMemory: Source has no descriptor: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Source has no descriptor: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
         if (!chunk->state.mapAllowed) {
             state.ctx->gpr.w0 = result::InvalidState;
-            state.logger->Warn("svcMapMemory: Source doesn't allow usage of svcMapMemory: Source: 0x{:X}, Destination: 0x{:X}, Size: 0x{:X}, MemoryState: 0x{:X}", source, destination, size, chunk->state.value);
+            state.logger->Warn("Source doesn't allow usage of svcMapMemory: Source: 0x{:X}, Destination: 0x{:X}, Size: 0x{:X}, MemoryState: 0x{:X}", source, destination, size, chunk->state.value);
             return;
         }
 
@@ -120,7 +121,7 @@ namespace skyline::kernel::svc {
             throw exception("svcMapMemory: Cannot find memory object in handle table for address 0x{:X}", source);
         object->item->UpdatePermission(source, size, {false, false, false});
 
-        state.logger->Debug("svcMapMemory: Mapped range 0x{:X} - 0x{:X} to 0x{:X} - 0x{:X} (Size: 0x{:X} bytes)", source, source + size, destination, destination + size, size);
+        state.logger->Debug("Mapped range 0x{:X} - 0x{:X} to 0x{:X} - 0x{:X} (Size: 0x{:X} bytes)", source, source + size, destination, destination + size, size);
         state.ctx->gpr.w0 = Result{};
     }
 
@@ -131,20 +132,20 @@ namespace skyline::kernel::svc {
 
         if (!util::PageAligned(destination) || !util::PageAligned(source)) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcUnmapMemory: Addresses not page aligned: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Addresses not page aligned: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
 
         if (!util::PageAligned(size)) {
             state.ctx->gpr.w0 = result::InvalidSize;
-            state.logger->Warn("svcUnmapMemory: 'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
+            state.logger->Warn("'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
             return;
         }
 
         auto stack{state.process->memory.stack};
         if (!stack.IsInside(source)) {
             state.ctx->gpr.w0 = result::InvalidMemoryRegion;
-            state.logger->Warn("svcUnmapMemory: Source not within stack region: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Source not within stack region: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
 
@@ -152,13 +153,13 @@ namespace skyline::kernel::svc {
         auto destChunk{state.process->memory.Get(destination)};
         if (!sourceChunk || !destChunk) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcUnmapMemory: Addresses have no descriptor: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
+            state.logger->Warn("Addresses have no descriptor: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes)", source, destination, size);
             return;
         }
 
         if (!destChunk->state.mapAllowed) {
             state.ctx->gpr.w0 = result::InvalidState;
-            state.logger->Warn("svcUnmapMemory: Destination doesn't allow usage of svcMapMemory: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes) 0x{:X}", source, destination, size, destChunk->state.value);
+            state.logger->Warn("Destination doesn't allow usage of svcMapMemory: Source: 0x{:X}, Destination: 0x{:X} (Size: 0x{:X} bytes) 0x{:X}", source, destination, size, destChunk->state.value);
             return;
         }
 
@@ -176,7 +177,7 @@ namespace skyline::kernel::svc {
 
         state.process->CloseHandle(sourceObject->handle);
 
-        state.logger->Debug("svcUnmapMemory: Unmapped range 0x{:X} - 0x{:X} to 0x{:X} - 0x{:X} (Size: 0x{:X} bytes)", source, source + size, destination, destination + size, size);
+        state.logger->Debug("Unmapped range 0x{:X} - 0x{:X} to 0x{:X} - 0x{:X} (Size: 0x{:X} bytes)", source, source + size, destination, destination + size, size);
         state.ctx->gpr.w0 = Result{};
     }
 
@@ -197,7 +198,7 @@ namespace skyline::kernel::svc {
                 .ipcRefCount = 0,
             };
 
-            state.logger->Debug("svcQueryMemory: Address: 0x{:X}, Region Start: 0x{:X}, Size: 0x{:X}, Type: 0x{:X}, Is Uncached: {}, Permissions: {}{}{}", pointer, memInfo.address, memInfo.size, memInfo.type, static_cast<bool>(chunk->attributes.isUncached), chunk->permission.r ? 'R' : '-', chunk->permission.w ? 'W' : '-', chunk->permission.x ? 'X' : '-');
+            state.logger->Debug("Address: 0x{:X}, Region Start: 0x{:X}, Size: 0x{:X}, Type: 0x{:X}, Is Uncached: {}, Permissions: {}{}{}", pointer, memInfo.address, memInfo.size, memInfo.type, static_cast<bool>(chunk->attributes.isUncached), chunk->permission.r ? 'R' : '-', chunk->permission.w ? 'W' : '-', chunk->permission.x ? 'X' : '-');
         } else {
             auto addressSpaceEnd{reinterpret_cast<u64>(state.process->memory.addressSpace.address + state.process->memory.addressSpace.size)};
 
@@ -207,7 +208,7 @@ namespace skyline::kernel::svc {
                 .type = static_cast<u32>(memory::MemoryType::Reserved),
             };
 
-            state.logger->Debug("svcQueryMemory: Trying to query memory outside of the application's address space: 0x{:X}", pointer);
+            state.logger->Debug("Trying to query memory outside of the application's address space: 0x{:X}", pointer);
         }
 
         *reinterpret_cast<memory::MemoryInfo *>(state.ctx->gpr.x0) = memInfo;
@@ -216,7 +217,7 @@ namespace skyline::kernel::svc {
     }
 
     void ExitProcess(const DeviceState &state) {
-        state.logger->Debug("svcExitProcess: Exiting process");
+        state.logger->Debug("Exiting process");
         if (state.thread->id)
             state.process->Kill(false);
         std::longjmp(state.thread->originalCtx, true);
@@ -236,13 +237,13 @@ namespace skyline::kernel::svc {
         idealCore = (idealCore == IdealCoreUseProcessValue) ? state.process->npdm.meta.idealCore : idealCore;
         if (idealCore < 0 || idealCore >= constant::CoreCount) {
             state.ctx->gpr.w0 = result::InvalidCoreId;
-            state.logger->Warn("svcCreateThread: 'idealCore' invalid: {}", idealCore);
+            state.logger->Warn("'idealCore' invalid: {}", idealCore);
             return;
         }
 
         if (!state.process->npdm.threadInfo.priority.Valid(priority)) {
             state.ctx->gpr.w0 = result::InvalidPriority;
-            state.logger->Warn("svcCreateThread: 'priority' invalid: {}", priority);
+            state.logger->Warn("'priority' invalid: {}", priority);
             return;
         }
 
@@ -252,12 +253,12 @@ namespace skyline::kernel::svc {
 
         auto thread{state.process->CreateThread(entry, entryArgument, stackTop, priority, idealCore)};
         if (thread) {
-            state.logger->Debug("svcCreateThread: Created thread #{} with handle 0x{:X} (Entry Point: 0x{:X}, Argument: 0x{:X}, Stack Pointer: 0x{:X}, Priority: {}, Ideal Core: {})", thread->id, thread->handle, entry, entryArgument, stackTop, priority, idealCore);
+            state.logger->Debug("Created thread #{} with handle 0x{:X} (Entry Point: 0x{:X}, Argument: 0x{:X}, Stack Pointer: 0x{:X}, Priority: {}, Ideal Core: {})", thread->id, thread->handle, entry, entryArgument, stackTop, priority, idealCore);
 
             state.ctx->gpr.w1 = thread->handle;
             state.ctx->gpr.w0 = Result{};
         } else {
-            state.logger->Debug("svcCreateThread: Cannot create thread (Entry Point: 0x{:X}, Argument: 0x{:X}, Stack Pointer: 0x{:X}, Priority: {}, Ideal Core: {})", entry, entryArgument, stackTop, priority, idealCore);
+            state.logger->Debug("Cannot create thread (Entry Point: 0x{:X}, Argument: 0x{:X}, Stack Pointer: 0x{:X}, Priority: {}, Ideal Core: {})", entry, entryArgument, stackTop, priority, idealCore);
             state.ctx->gpr.w1 = 0;
             state.ctx->gpr.w0 = result::OutOfResource;
         }
@@ -267,17 +268,17 @@ namespace skyline::kernel::svc {
         KHandle handle{state.ctx->gpr.w0};
         try {
             auto thread{state.process->GetHandle<type::KThread>(handle)};
-            state.logger->Debug("svcStartThread: Starting thread #{}: 0x{:X}", thread->id, handle);
+            state.logger->Debug("Starting thread #{}: 0x{:X}", thread->id, handle);
             thread->Start();
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcStartThread: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
 
     void ExitThread(const DeviceState &state) {
-        state.logger->Debug("svcExitThread: Exiting current thread");
+        state.logger->Debug("Exiting current thread");
         std::longjmp(state.thread->originalCtx, true);
     }
 
@@ -288,7 +289,8 @@ namespace skyline::kernel::svc {
 
         i64 in{static_cast<i64>(state.ctx->gpr.x0)};
         if (in > 0) {
-            state.logger->Debug("svcSleepThread: Sleeping for {}ns", in);
+            state.logger->Debug("Sleeping for {}ns", in);
+            TRACE_EVENT("kernel", "SleepThread", "duration", in);
 
             struct timespec spec{
                 .tv_sec = static_cast<time_t>(in / 1000000000),
@@ -299,22 +301,30 @@ namespace skyline::kernel::svc {
             nanosleep(&spec, nullptr);
         } else {
             switch (in) {
-                case yieldWithCoreMigration:
-                    state.logger->Debug("svcSleepThread: Waking any appropriate parked threads and yielding");
+                case yieldWithCoreMigration: {
+                    state.logger->Debug("Waking any appropriate parked threads and yielding");
+                    TRACE_EVENT("kernel", "YieldWithCoreMigration");
                     state.scheduler->WakeParkedThread();
-                    [[fallthrough]];
-                case yieldWithoutCoreMigration:
-                    if (in == yieldWithoutCoreMigration)
-                        state.logger->Debug("svcSleepThread: Cooperative yield");
                     state.scheduler->Rotate();
                     state.scheduler->WaitSchedule();
                     break;
+                }
 
-                case yieldToAnyThread:
-                    state.logger->Debug("svcSleepThread: Parking current thread");
+                case yieldWithoutCoreMigration: {
+                    state.logger->Debug("Cooperative yield");
+                    TRACE_EVENT("kernel", "YieldWithoutCoreMigration");
+                    state.scheduler->Rotate();
+                    state.scheduler->WaitSchedule();
+                    break;
+                }
+
+                case yieldToAnyThread: {
+                    state.logger->Debug("Parking current thread");
+                    TRACE_EVENT("kernel", "YieldToAnyThread");
                     state.scheduler->ParkThread();
                     state.scheduler->WaitSchedule(false);
                     break;
+                }
 
                 default:
                     break;
@@ -327,12 +337,12 @@ namespace skyline::kernel::svc {
         try {
             auto thread{state.process->GetHandle<type::KThread>(handle)};
             u8 priority{thread->priority};
-            state.logger->Debug("svcGetThreadPriority: Retrieving thread #{}'s priority: {}", thread->id, priority);
+            state.logger->Debug("Retrieving thread #{}'s priority: {}", thread->id, priority);
 
             state.ctx->gpr.w1 = priority;
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcGetThreadPriority: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -341,13 +351,13 @@ namespace skyline::kernel::svc {
         KHandle handle{state.ctx->gpr.w0};
         u8 priority{static_cast<u8>(state.ctx->gpr.w1)};
         if (!state.process->npdm.threadInfo.priority.Valid(priority)) {
-            state.logger->Warn("svcSetThreadPriority: 'priority' invalid: 0x{:X}", priority);
+            state.logger->Warn("'priority' invalid: 0x{:X}", priority);
             state.ctx->gpr.w0 = result::InvalidPriority;
             return;
         }
         try {
             auto thread{state.process->GetHandle<type::KThread>(handle)};
-            state.logger->Debug("svcSetThreadPriority: Setting thread #{}'s priority to {}", thread->id, priority);
+            state.logger->Debug("Setting thread #{}'s priority to {}", thread->id, priority);
             if (thread->priority != priority) {
                 thread->basePriority = priority;
                 u8 newPriority{};
@@ -362,7 +372,7 @@ namespace skyline::kernel::svc {
             }
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcSetThreadPriority: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -373,13 +383,13 @@ namespace skyline::kernel::svc {
             auto thread{state.process->GetHandle<type::KThread>(handle)};
             auto idealCore{thread->idealCore};
             auto affinityMask{thread->affinityMask};
-            state.logger->Debug("svcGetThreadCoreMask: Getting thread #{}'s Ideal Core ({}) + Affinity Mask ({})", thread->id, idealCore, affinityMask);
+            state.logger->Debug("Getting thread #{}'s Ideal Core ({}) + Affinity Mask ({})", thread->id, idealCore, affinityMask);
 
             state.ctx->gpr.x2 = affinityMask.to_ullong();
             state.ctx->gpr.w1 = idealCore;
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcGetThreadCoreMask: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -402,25 +412,25 @@ namespace skyline::kernel::svc {
 
             auto processMask{state.process->npdm.threadInfo.coreMask};
             if ((processMask | affinityMask) != processMask) {
-                state.logger->Warn("svcSetThreadCoreMask: 'affinityMask' invalid: {} (Process Mask: {})", affinityMask, processMask);
+                state.logger->Warn("'affinityMask' invalid: {} (Process Mask: {})", affinityMask, processMask);
                 state.ctx->gpr.w0 = result::InvalidCoreId;
                 return;
             }
 
             if (affinityMask.none() || !affinityMask.test(idealCore)) {
-                state.logger->Warn("svcSetThreadCoreMask: 'affinityMask' invalid: {} (Ideal Core: {})", affinityMask, idealCore);
+                state.logger->Warn("'affinityMask' invalid: {} (Ideal Core: {})", affinityMask, idealCore);
                 state.ctx->gpr.w0 = result::InvalidCombination;
                 return;
             }
 
-            state.logger->Debug("svcSetThreadCoreMask: Setting thread #{}'s Ideal Core ({}) + Affinity Mask ({})", thread->id, idealCore, affinityMask);
+            state.logger->Debug("Setting thread #{}'s Ideal Core ({}) + Affinity Mask ({})", thread->id, idealCore, affinityMask);
 
             std::lock_guard guard(thread->coreMigrationMutex);
             thread->idealCore = idealCore;
             thread->affinityMask = affinityMask;
 
             if (!affinityMask.test(thread->coreId) && thread->coreId != constant::ParkedCoreId) {
-                state.logger->Debug("svcSetThreadCoreMask: Migrating thread #{} to Ideal Core C{} -> C{}", thread->id, thread->coreId, idealCore);
+                state.logger->Debug("Migrating thread #{} to Ideal Core C{} -> C{}", thread->id, thread->coreId, idealCore);
 
                 if (thread == state.thread) {
                     state.scheduler->RemoveThread();
@@ -436,7 +446,7 @@ namespace skyline::kernel::svc {
 
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcSetThreadCoreMask: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -444,18 +454,19 @@ namespace skyline::kernel::svc {
     void GetCurrentProcessorNumber(const DeviceState &state) {
         std::lock_guard guard(state.thread->coreMigrationMutex);
         auto coreId{state.thread->coreId};
-        state.logger->Debug("svcGetCurrentProcessorNumber: C{}", coreId);
+        state.logger->Debug("C{}", coreId);
         state.ctx->gpr.w0 = coreId;
     }
 
     void ClearEvent(const DeviceState &state) {
         KHandle handle{state.ctx->gpr.w0};
+        TRACE_EVENT_FMT("kernel", "ClearEvent 0x{:X}", handle);
         try {
             std::static_pointer_cast<type::KEvent>(state.process->GetHandle(handle))->ResetSignal();
-            state.logger->Debug("svcClearEvent: Clearing 0x{:X}", handle);
+            state.logger->Debug("Clearing 0x{:X}", handle);
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcClearEvent: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
             return;
         }
@@ -468,31 +479,31 @@ namespace skyline::kernel::svc {
 
             if (!util::PageAligned(pointer)) {
                 state.ctx->gpr.w0 = result::InvalidAddress;
-                state.logger->Warn("svcMapSharedMemory: 'pointer' not page aligned: 0x{:X}", pointer);
+                state.logger->Warn("'pointer' not page aligned: 0x{:X}", pointer);
                 return;
             }
 
             size_t size{state.ctx->gpr.x2};
             if (!util::PageAligned(size)) {
                 state.ctx->gpr.w0 = result::InvalidSize;
-                state.logger->Warn("svcMapSharedMemory: 'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
+                state.logger->Warn("'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
                 return;
             }
 
             memory::Permission permission(state.ctx->gpr.w3);
             if ((permission.w && !permission.r) || (permission.x && !permission.r)) {
-                state.logger->Warn("svcMapSharedMemory: 'permission' invalid: {}{}{}", permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
+                state.logger->Warn("'permission' invalid: {}{}{}", permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
                 state.ctx->gpr.w0 = result::InvalidNewMemoryPermission;
                 return;
             }
 
-            state.logger->Debug("svcMapSharedMemory: Mapping shared memory at 0x{:X} - 0x{:X} (0x{:X} bytes) ({}{}{})", pointer, pointer + size, size, permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
+            state.logger->Debug("Mapping shared memory at 0x{:X} - 0x{:X} (0x{:X} bytes) ({}{}{})", pointer, pointer + size, size, permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
 
             object->Map(pointer, size, permission);
 
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcMapSharedMemory: 'handle' invalid: 0x{:X}", static_cast<u32>(state.ctx->gpr.w0));
+            state.logger->Warn("'handle' invalid: 0x{:X}", static_cast<u32>(state.ctx->gpr.w0));
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -501,26 +512,26 @@ namespace skyline::kernel::svc {
         auto pointer{reinterpret_cast<u8 *>(state.ctx->gpr.x1)};
         if (!util::PageAligned(pointer)) {
             state.ctx->gpr.w0 = result::InvalidAddress;
-            state.logger->Warn("svcCreateTransferMemory: 'pointer' not page aligned: 0x{:X}", pointer);
+            state.logger->Warn("'pointer' not page aligned: 0x{:X}", pointer);
             return;
         }
 
         size_t size{state.ctx->gpr.x2};
         if (!util::PageAligned(size)) {
             state.ctx->gpr.w0 = result::InvalidSize;
-            state.logger->Warn("svcCreateTransferMemory: 'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
+            state.logger->Warn("'size' {}: 0x{:X}", size ? "not page aligned" : "is zero", size);
             return;
         }
 
         memory::Permission permission(state.ctx->gpr.w3);
         if ((permission.w && !permission.r) || (permission.x && !permission.r)) {
-            state.logger->Warn("svcCreateTransferMemory: 'permission' invalid: {}{}{}", permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
+            state.logger->Warn("'permission' invalid: {}{}{}", permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
             state.ctx->gpr.w0 = result::InvalidNewMemoryPermission;
             return;
         }
 
         auto tmem{state.process->NewHandle<type::KTransferMemory>(pointer, size, permission)};
-        state.logger->Debug("svcCreateTransferMemory: Creating transfer memory at 0x{:X} - 0x{:X} (0x{:X} bytes) ({}{}{})", pointer, pointer + size, size, permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
+        state.logger->Debug("Creating transfer memory at 0x{:X} - 0x{:X} (0x{:X} bytes) ({}{}{})", pointer, pointer + size, size, permission.r ? 'R' : '-', permission.w ? 'W' : '-', permission.x ? 'X' : '-');
 
         state.ctx->gpr.w0 = Result{};
         state.ctx->gpr.w1 = tmem.handle;
@@ -530,16 +541,17 @@ namespace skyline::kernel::svc {
         KHandle handle{static_cast<KHandle>(state.ctx->gpr.w0)};
         try {
             state.process->CloseHandle(handle);
-            state.logger->Debug("svcCloseHandle: Closing 0x{:X}", handle);
+            state.logger->Debug("Closing 0x{:X}", handle);
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcCloseHandle: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
 
     void ResetSignal(const DeviceState &state) {
         KHandle handle{state.ctx->gpr.w0};
+        TRACE_EVENT_FMT("kernel", "ResetSignal 0x{:X}", handle);
         try {
             auto object{state.process->GetHandle(handle)};
             switch (object->objectType) {
@@ -549,16 +561,16 @@ namespace skyline::kernel::svc {
                     break;
 
                 default: {
-                    state.logger->Warn("svcResetSignal: 'handle' type invalid: 0x{:X} ({})", handle, object->objectType);
+                    state.logger->Warn("'handle' type invalid: 0x{:X} ({})", handle, object->objectType);
                     state.ctx->gpr.w0 = result::InvalidHandle;
                     return;
                 }
             }
 
-            state.logger->Debug("svcResetSignal: Resetting 0x{:X}", handle);
+            state.logger->Debug("Resetting 0x{:X}", handle);
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcResetSignal: 'handle' invalid: 0x{:X}", handle);
+            state.logger->Warn("'handle' invalid: 0x{:X}", handle);
             state.ctx->gpr.w0 = result::InvalidHandle;
             return;
         }
@@ -588,7 +600,7 @@ namespace skyline::kernel::svc {
                     break;
 
                 default: {
-                    state.logger->Debug("svcWaitSynchronization: An invalid handle was supplied: 0x{:X}", handle);
+                    state.logger->Debug("An invalid handle was supplied: 0x{:X}", handle);
                     state.ctx->gpr.w0 = result::InvalidHandle;
                     return;
                 }
@@ -597,12 +609,14 @@ namespace skyline::kernel::svc {
 
         i64 timeout{static_cast<i64>(state.ctx->gpr.x3)};
         if (waitHandles.size() == 1) {
-            state.logger->Debug("svcWaitSynchronization: Waiting on 0x{:X} for {}ns", waitHandles[0], timeout);
+            state.logger->Debug("Waiting on 0x{:X} for {}ns", waitHandles[0], timeout);
+            TRACE_EVENT_FMT("kernel", "WaitSynchronization 0x{:X}", waitHandles[0]);
         } else if (Logger::LogLevel::Debug <= state.logger->configLevel) {
             std::string handleString;
             for (const auto &handle : waitHandles)
                 handleString += fmt::format("* 0x{:X}\n", handle);
-            state.logger->Debug("svcWaitSynchronization: Waiting on handles:\n{}Timeout: {}ns", handleString, timeout);
+            state.logger->Debug("Waiting on handles:\n{}Timeout: {}ns", handleString, timeout);
+            TRACE_EVENT("kernel", "WaitSynchronizationMultiple");
         }
 
         std::unique_lock lock(type::KSyncObject::syncObjectMutex);
@@ -615,7 +629,7 @@ namespace skyline::kernel::svc {
         u32 index{};
         for (const auto &object : objectTable) {
             if (object->signalled) {
-                state.logger->Debug("svcWaitSynchronization: Signalled 0x{:X}", waitHandles[index]);
+                state.logger->Debug("Signalled 0x{:X}", waitHandles[index]);
                 state.ctx->gpr.w0 = Result{};
                 state.ctx->gpr.w1 = index;
                 return;
@@ -624,7 +638,7 @@ namespace skyline::kernel::svc {
         }
 
         if (timeout == 0) {
-            state.logger->Debug("svcWaitSynchronization: No handle is currently signalled");
+            state.logger->Debug("No handle is currently signalled");
             state.ctx->gpr.w0 = result::TimedOut;
             return;
         }
@@ -663,15 +677,15 @@ namespace skyline::kernel::svc {
         }
 
         if (wakeObject) {
-            state.logger->Debug("svcWaitSynchronization: Signalled 0x{:X}", waitHandles[wakeIndex]);
+            state.logger->Debug("Signalled 0x{:X}", waitHandles[wakeIndex]);
             state.ctx->gpr.w0 = Result{};
             state.ctx->gpr.w1 = wakeIndex;
         } else if (state.thread->cancelSync) {
             state.thread->cancelSync = false;
-            state.logger->Debug("svcWaitSynchronization: Wait has been cancelled");
+            state.logger->Debug("Wait has been cancelled");
             state.ctx->gpr.w0 = result::Cancelled;
         } else {
-            state.logger->Debug("svcWaitSynchronization: Wait has timed out");
+            state.logger->Debug("Wait has timed out");
             state.ctx->gpr.w0 = result::TimedOut;
             lock.unlock();
             state.scheduler->InsertThread(state.thread);
@@ -690,7 +704,7 @@ namespace skyline::kernel::svc {
             }
             state.ctx->gpr.w0 = Result{};
         } catch (const std::out_of_range &) {
-            state.logger->Warn("svcCancelSynchronization: 'handle' invalid: 0x{:X}", static_cast<u32>(state.ctx->gpr.w0));
+            state.logger->Warn("'handle' invalid: 0x{:X}", static_cast<u32>(state.ctx->gpr.w0));
             state.ctx->gpr.w0 = result::InvalidHandle;
         }
     }
@@ -698,22 +712,23 @@ namespace skyline::kernel::svc {
     void ArbitrateLock(const DeviceState &state) {
         auto mutex{reinterpret_cast<u32 *>(state.ctx->gpr.x1)};
         if (!util::WordAligned(mutex)) {
-            state.logger->Warn("svcArbitrateLock: 'mutex' not word aligned: 0x{:X}", mutex);
+            state.logger->Warn("'mutex' not word aligned: 0x{:X}", mutex);
             state.ctx->gpr.w0 = result::InvalidAddress;
             return;
         }
 
-        state.logger->Debug("svcArbitrateLock: Locking 0x{:X}", mutex);
+        state.logger->Debug("Locking 0x{:X}", mutex);
+        TRACE_EVENT_FMT("kernel", "MutexLock 0x{:X}", mutex);
 
         KHandle ownerHandle{state.ctx->gpr.w0};
         KHandle requesterHandle{state.ctx->gpr.w2};
         auto result{state.process->MutexLock(mutex, ownerHandle, requesterHandle)};
         if (result == Result{})
-            state.logger->Debug("svcArbitrateLock: Locked 0x{:X}", mutex);
+            state.logger->Debug("Locked 0x{:X}", mutex);
         else if (result == result::InvalidCurrentMemory)
             result = Result{}; // If the mutex value isn't expected then it's still successful
         else if (result == result::InvalidHandle)
-            state.logger->Warn("svcArbitrateLock: 'ownerHandle' invalid: 0x{:X} (0x{:X})", ownerHandle, mutex);
+            state.logger->Warn("'ownerHandle' invalid: 0x{:X} (0x{:X})", ownerHandle, mutex);
 
         state.ctx->gpr.w0 = result;
     }
@@ -721,14 +736,16 @@ namespace skyline::kernel::svc {
     void ArbitrateUnlock(const DeviceState &state) {
         auto mutex{reinterpret_cast<u32 *>(state.ctx->gpr.x0)};
         if (!util::WordAligned(mutex)) {
-            state.logger->Warn("svcArbitrateUnlock: 'mutex' not word aligned: 0x{:X}", mutex);
+            state.logger->Warn("'mutex' not word aligned: 0x{:X}", mutex);
             state.ctx->gpr.w0 = result::InvalidAddress;
             return;
         }
 
-        state.logger->Debug("svcArbitrateUnlock: Unlocking 0x{:X}", mutex);
+        TRACE_EVENT_FMT("kernel", "MutexUnlock 0x{:X}", mutex);
+
+        state.logger->Debug("Unlocking 0x{:X}", mutex);
         state.process->MutexUnlock(mutex);
-        state.logger->Debug("svcArbitrateUnlock: Unlocked 0x{:X}", mutex);
+        state.logger->Debug("Unlocked 0x{:X}", mutex);
 
         state.ctx->gpr.w0 = Result{};
     }
@@ -736,7 +753,7 @@ namespace skyline::kernel::svc {
     void WaitProcessWideKeyAtomic(const DeviceState &state) {
         auto mutex{reinterpret_cast<u32 *>(state.ctx->gpr.x0)};
         if (!util::WordAligned(mutex)) {
-            state.logger->Warn("svcWaitProcessWideKeyAtomic: 'mutex' not word aligned: 0x{:X}", mutex);
+            state.logger->Warn("'mutex' not word aligned: 0x{:X}", mutex);
             state.ctx->gpr.w0 = result::InvalidAddress;
             return;
         }
@@ -745,13 +762,13 @@ namespace skyline::kernel::svc {
         KHandle requesterHandle{state.ctx->gpr.w2};
 
         i64 timeout{static_cast<i64>(state.ctx->gpr.x3)};
-        state.logger->Debug("svcWaitProcessWideKeyAtomic: Waiting on 0x{:X} with 0x{:X} for {}ns", conditional, mutex, timeout);
+        state.logger->Debug("Waiting on 0x{:X} with 0x{:X} for {}ns", conditional, mutex, timeout);
 
         auto result{state.process->ConditionalVariableWait(conditional, mutex, requesterHandle, timeout)};
         if (result == Result{})
-            state.logger->Debug("svcWaitProcessWideKeyAtomic: Waited for 0x{:X} and reacquired 0x{:X}", conditional, mutex);
+            state.logger->Debug("Waited for 0x{:X} and reacquired 0x{:X}", conditional, mutex);
         else if (result == result::TimedOut)
-            state.logger->Debug("svcWaitProcessWideKeyAtomic: Wait on 0x{:X} has timed out after {}ns", conditional, timeout);
+            state.logger->Debug("Wait on 0x{:X} has timed out after {}ns", conditional, timeout);
         state.ctx->gpr.w0 = result;
     }
 
@@ -759,7 +776,7 @@ namespace skyline::kernel::svc {
         auto conditional{reinterpret_cast<u32 *>(state.ctx->gpr.x0)};
         i32 count{static_cast<i32>(state.ctx->gpr.w1)};
 
-        state.logger->Debug("svcSignalProcessWideKey: Signalling 0x{:X} for {} waiters", conditional, count);
+        state.logger->Debug("Signalling 0x{:X} for {} waiters", conditional, count);
         state.process->ConditionalVariableSignal(conditional, count);
         state.ctx->gpr.w0 = Result{};
     }
@@ -787,12 +804,12 @@ namespace skyline::kernel::svc {
         if (port.compare("sm:") >= 0) {
             handle = state.process->NewHandle<type::KSession>(std::static_pointer_cast<service::BaseService>(state.os->serviceManager.smUserInterface)).handle;
         } else {
-            state.logger->Warn("svcConnectToNamedPort: Connecting to invalid port: '{}'", port);
+            state.logger->Warn("Connecting to invalid port: '{}'", port);
             state.ctx->gpr.w0 = result::NotFound;
             return;
         }
 
-        state.logger->Debug("svcConnectToNamedPort: Connecting to port '{}' at 0x{:X}", port, handle);
+        state.logger->Debug("Connecting to port '{}' at 0x{:X}", port, handle);
 
         state.ctx->gpr.w1 = handle;
         state.ctx->gpr.w0 = Result{};
@@ -808,7 +825,7 @@ namespace skyline::kernel::svc {
         KHandle handle{state.ctx->gpr.w1};
         size_t tid{state.process->GetHandle<type::KThread>(handle)->id};
 
-        state.logger->Debug("svcGetThreadId: Handle: 0x{:X}, TID: {}", handle, tid);
+        state.logger->Debug("Handle: 0x{:X}, TID: {}", handle, tid);
 
         state.ctx->gpr.x1 = tid;
         state.ctx->gpr.w0 = Result{};
@@ -817,9 +834,9 @@ namespace skyline::kernel::svc {
     void Break(const DeviceState &state) {
         auto reason{state.ctx->gpr.x0};
         if (reason & (1ULL << 31)) {
-            state.logger->Debug("svcBreak: Debugger is being engaged ({})", reason);
+            state.logger->Debug("Debugger is being engaged ({})", reason);
         } else {
-            state.logger->Error("svcBreak: Exit Stack Trace ({}){}", reason, state.loader->GetStackTrace());
+            state.logger->Error("Exit Stack Trace ({}){}", reason, state.loader->GetStackTrace());
             if (state.thread->id)
                 state.process->Kill(false);
             std::longjmp(state.thread->originalCtx, true);
@@ -827,12 +844,12 @@ namespace skyline::kernel::svc {
     }
 
     void OutputDebugString(const DeviceState &state) {
-        auto string{span(reinterpret_cast<u8 *>(state.ctx->gpr.x0), state.ctx->gpr.x1).as_string()};
+        auto string{span(reinterpret_cast<char *>(state.ctx->gpr.x0), state.ctx->gpr.x1).as_string()};
 
         if (string.back() == '\n')
             string.remove_suffix(1);
 
-        state.logger->Info("svcOutputDebugString: {}", string);
+        state.logger->Info("{}", string);
         state.ctx->gpr.w0 = Result{};
     }
 
@@ -959,12 +976,12 @@ namespace skyline::kernel::svc {
                 break;
 
             default:
-                state.logger->Warn("svcGetInfo: Unimplemented case ID0: {}, ID1: {}", static_cast<u32>(info), id1);
+                state.logger->Warn("Unimplemented case ID0: {}, ID1: {}", static_cast<u32>(info), id1);
                 state.ctx->gpr.w0 = result::InvalidEnumValue;
                 return;
         }
 
-        state.logger->Debug("svcGetInfo: ID0: {}, ID1: {}, Out: 0x{:X}", static_cast<u32>(info), id1, out);
+        state.logger->Debug("ID0: {}, ID1: {}, Out: 0x{:X}", static_cast<u32>(info), id1, out);
 
         state.ctx->gpr.x1 = out;
         state.ctx->gpr.w0 = Result{};
@@ -1019,7 +1036,7 @@ namespace skyline::kernel::svc {
             if (memory) {
                 auto item{static_pointer_cast<type::KPrivateMemory>(memory->item)};
                 auto initialSize{item->size};
-                if (item->memState == memory::states::Heap) {
+                if (item->memoryState == memory::states::Heap) {
                     if (item->ptr >= pointer) {
                         if (item->size <= size) {
                             item->Resize(0);
@@ -1046,7 +1063,7 @@ namespace skyline::kernel::svc {
     void WaitForAddress(const DeviceState &state) {
         auto address{reinterpret_cast<u32 *>(state.ctx->gpr.x0)};
         if (!util::WordAligned(address)) [[unlikely]] {
-            state.logger->Warn("svcWaitForAddress: 'address' not word aligned: 0x{:X}", address);
+            state.logger->Warn("'address' not word aligned: 0x{:X}", address);
             state.ctx->gpr.w0 = result::InvalidAddress;
             return;
         }
@@ -1062,14 +1079,14 @@ namespace skyline::kernel::svc {
         Result result;
         switch (arbitrationType) {
             case ArbitrationType::WaitIfLessThan:
-                state.logger->Debug("svcWaitForAddress: Waiting on 0x{:X} if less than {} for {}ns", address, value, timeout);
+                state.logger->Debug("Waiting on 0x{:X} if less than {} for {}ns", address, value, timeout);
                 result = state.process->WaitForAddress(address, value, timeout, [](u32 *address, u32 value) {
                     return *address < value;
                 });
                 break;
 
             case ArbitrationType::DecrementAndWaitIfLessThan:
-                state.logger->Debug("svcWaitForAddress: Waiting on and decrementing 0x{:X} if less than {} for {}ns", address, value, timeout);
+                state.logger->Debug("Waiting on and decrementing 0x{:X} if less than {} for {}ns", address, value, timeout);
                 result = state.process->WaitForAddress(address, value, timeout, [](u32 *address, u32 value) {
                     u32 userValue{__atomic_load_n(address, __ATOMIC_SEQ_CST)};
                     do {
@@ -1081,7 +1098,7 @@ namespace skyline::kernel::svc {
                 break;
 
             case ArbitrationType::WaitIfEqual:
-                state.logger->Debug("svcWaitForAddress: Waiting on 0x{:X} if equal to {} for {}ns", address, value, timeout);
+                state.logger->Debug("Waiting on 0x{:X} if equal to {} for {}ns", address, value, timeout);
                 result = state.process->WaitForAddress(address, value, timeout, [](u32 *address, u32 value) {
                     return *address == value;
                 });
@@ -1089,18 +1106,18 @@ namespace skyline::kernel::svc {
 
             default:
                 [[unlikely]]
-                    state.logger->Error("svcWaitForAddress: 'arbitrationType' invalid: {}", arbitrationType);
+                    state.logger->Error("'arbitrationType' invalid: {}", arbitrationType);
                 state.ctx->gpr.w0 = result::InvalidEnumValue;
                 return;
         }
 
         if (result == Result{})
             [[likely]]
-                state.logger->Debug("svcWaitForAddress: Waited on 0x{:X} successfully", address);
+                state.logger->Debug("Waited on 0x{:X} successfully", address);
         else if (result == result::TimedOut)
-            state.logger->Debug("svcWaitForAddress: Wait on 0x{:X} has timed out after {}ns", address, timeout);
+            state.logger->Debug("Wait on 0x{:X} has timed out after {}ns", address, timeout);
         else if (result == result::InvalidState)
-            state.logger->Debug("svcWaitForAddress: The value at 0x{:X} did not satisfy the arbitration condition", address);
+            state.logger->Debug("The value at 0x{:X} did not satisfy the arbitration condition", address);
 
         state.ctx->gpr.w0 = result;
     }
@@ -1108,7 +1125,7 @@ namespace skyline::kernel::svc {
     void SignalToAddress(const DeviceState &state) {
         auto address{reinterpret_cast<u32 *>(state.ctx->gpr.x0)};
         if (!util::WordAligned(address)) [[unlikely]] {
-            state.logger->Warn("svcWaitForAddress: 'address' not word aligned: 0x{:X}", address);
+            state.logger->Warn("'address' not word aligned: 0x{:X}", address);
             state.ctx->gpr.w0 = result::InvalidAddress;
             return;
         }
@@ -1124,19 +1141,19 @@ namespace skyline::kernel::svc {
         Result result;
         switch (signalType) {
             case SignalType::Signal:
-                state.logger->Debug("svcSignalToAddress: Signalling 0x{:X} for {} waiters", address, count);
+                state.logger->Debug("Signalling 0x{:X} for {} waiters", address, count);
                 result = state.process->SignalToAddress(address, value, count);
                 break;
 
             case SignalType::SignalAndIncrementIfEqual:
-                state.logger->Debug("svcSignalToAddress: Signalling 0x{:X} and incrementing if equal to {} for {} waiters", address, value, count);
+                state.logger->Debug("Signalling 0x{:X} and incrementing if equal to {} for {} waiters", address, value, count);
                 result = state.process->SignalToAddress(address, value, count, [](u32 *address, u32 value, u32) {
                     return __atomic_compare_exchange_n(address, &value, value + 1, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
                 });
                 break;
 
             case SignalType::SignalAndModifyBasedOnWaitingThreadCountIfEqual:
-                state.logger->Debug("svcSignalToAddress: Signalling 0x{:X} and setting to waiting thread count if equal to {} for {} waiters", address, value, count);
+                state.logger->Debug("Signalling 0x{:X} and setting to waiting thread count if equal to {} for {} waiters", address, value, count);
                 result = state.process->SignalToAddress(address, value, count, [](u32 *address, u32 value, u32 waiterCount) {
                     return __atomic_compare_exchange_n(address, &value, waiterCount, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
                 });
@@ -1144,16 +1161,16 @@ namespace skyline::kernel::svc {
 
             default:
                 [[unlikely]]
-                    state.logger->Error("svcSignalToAddress: 'signalType' invalid: {}", signalType);
+                    state.logger->Error("'signalType' invalid: {}", signalType);
                 state.ctx->gpr.w0 = result::InvalidEnumValue;
                 return;
         }
 
         if (result == Result{})
             [[likely]]
-                state.logger->Debug("svcSignalToAddress: Signalled 0x{:X} for {} successfully", address, count);
+                state.logger->Debug("Signalled 0x{:X} for {} successfully", address, count);
         else if (result == result::InvalidState)
-            state.logger->Debug("svcSignalToAddress: The value at 0x{:X} did not satisfy the mutation condition", address);
+            state.logger->Debug("The value at 0x{:X} did not satisfy the mutation condition", address);
 
         state.ctx->gpr.w0 = result;
     }

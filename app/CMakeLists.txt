@@ -17,7 +17,9 @@ if (uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE")
 endif ()
 
 add_subdirectory("libraries/fmt")
+
 add_subdirectory("libraries/tzcode")
+target_compile_options(tzcode PRIVATE -Wno-everything)
 
 add_subdirectory("libraries/oboe")
 include_directories("libraries/oboe/include")
@@ -32,6 +34,11 @@ include_directories("libraries/frozen/include")
 
 find_package(mbedtls REQUIRED CONFIG)
 
+# Perfetto SDK
+include_directories(libraries/perfetto/sdk)
+add_library(perfetto STATIC libraries/perfetto/sdk/perfetto.cc)
+target_compile_options(perfetto PRIVATE -Wno-everything)
+
 include_directories(${source_DIR}/skyline)
 
 add_library(skyline SHARED
@@ -41,6 +48,7 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/common/settings.cpp
         ${source_DIR}/skyline/common/signal.cpp
         ${source_DIR}/skyline/common/uuid.cpp
+        ${source_DIR}/skyline/common/trace.cpp
         ${source_DIR}/skyline/nce/guest.S
         ${source_DIR}/skyline/nce.cpp
         ${source_DIR}/skyline/jvm.cpp
@@ -180,5 +188,5 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/prepo/IPrepoService.cpp
         )
 # target_precompile_headers(skyline PRIVATE ${source_DIR}/skyline/common.h) # PCH will currently break Intellisense
-target_link_libraries(skyline vulkan android fmt lz4_static tzcode oboe mbedtls::mbedcrypto)
+target_link_libraries(skyline vulkan android perfetto fmt lz4_static tzcode oboe mbedtls::mbedcrypto)
 target_compile_options(skyline PRIVATE -Wall -Wno-unknown-attributes -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c99-designator -Wno-reorder -Wno-missing-braces -Wno-unused-variable -Wno-unused-private-field)

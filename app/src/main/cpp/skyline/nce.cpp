@@ -4,8 +4,8 @@
 #include <cxxabi.h>
 #include <unistd.h>
 #include "common/signal.h"
+#include "common/trace.h"
 #include "os.h"
-#include "gpu.h"
 #include "jvm.h"
 #include "kernel/types/KProcess.h"
 #include "kernel/svc.h"
@@ -14,15 +14,17 @@
 #include "nce.h"
 
 namespace skyline::nce {
-    void NCE::SvcHandler(u16 svc, ThreadContext *ctx) {
+    void NCE::SvcHandler(u16 svcId, ThreadContext *ctx) {
+        TRACE_EVENT_END("guest");
+
         const auto &state{*ctx->state};
+        auto svc{kernel::svc::SvcTable[svcId]};
         try {
-            auto function{kernel::svc::SvcTable[svc]};
-            if (function) [[likely]] {
-                state.logger->Debug("SVC called 0x{:X}", svc);
-                (*function)(state);
+            if (svc) [[likely]] {
+                TRACE_EVENT("kernel", perfetto::StaticString{svc.name});
+                (svc.function)(state);
             } else [[unlikely]] {
-                throw exception("Unimplemented SVC 0x{:X}", svc);
+                throw exception("Unimplemented SVC 0x{:X}", svcId);
             }
 
             while (kernel::Scheduler::YieldPending) [[unlikely]] {
@@ -32,7 +34,7 @@ namespace skyline::nce {
             }
         } catch (const signal::SignalException &e) {
             if (e.signal != SIGINT) {
-                state.logger->Error("{} (SVC: 0x{:X})\nStack Trace:{}", e.what(), svc, state.loader->GetStackTrace(e.frames));
+                state.logger->ErrorNoPrefix("{} (SVC: 0x{:X})\nStack Trace:{}", e.what(), svc.name, state.loader->GetStackTrace(e.frames));
                 if (state.thread->id) {
                     signal::BlockSignal({SIGINT});
                     state.process->Kill(false);
@@ -41,7 +43,11 @@ namespace skyline::nce {
             abi::__cxa_end_catch(); // We call this prior to the longjmp to cause the exception object to be destroyed
             std::longjmp(state.thread->originalCtx, true);
         } catch (const std::exception &e) {
-            state.logger->Error("{} (SVC: 0x{:X})\nStack Trace:{}", e.what(), svc, state.loader->GetStackTrace());
+            if (svc)
+                state.logger->ErrorNoPrefix("{} (SVC: {})\nStack Trace:{}", e.what(), svc.name, state.loader->GetStackTrace());
+            else
+                state.logger->ErrorNoPrefix("{} (SVC: 0x{:X})\nStack Trace:{}", e.what(), svcId, state.loader->GetStackTrace());
+
             if (state.thread->id) {
                 signal::BlockSignal({SIGINT});
                 state.process->Kill(false);
@@ -49,6 +55,8 @@ namespace skyline::nce {
             abi::__cxa_end_catch();
             std::longjmp(state.thread->originalCtx, true);
         }
+
+        TRACE_EVENT_BEGIN("guest", "Guest");
     }
 
     void NCE::SignalHandler(int signal, siginfo *info, ucontext *ctx, void **tls) {
