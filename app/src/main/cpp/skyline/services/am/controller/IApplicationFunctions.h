@@ -7,6 +7,10 @@
 #include <services/serviceman.h>
 
 namespace skyline::service::am {
+    namespace result {
+        constexpr Result InvalidParameters(128, 506);
+    }
+
     /**
      * @brief This is used to notify an application about its own state
      * @url https://switchbrew.org/wiki/Applet_Manager_services#IApplicationFunctions
@@ -43,7 +47,7 @@ namespace skyline::service::am {
         Result NotifyRunning(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
 
         /**
-         * @brief Returns a UUID, however what it refers to is currently unknown
+         * @brief Returns a V5 UUID generated from a seed in control.nacp and a device specific seed
          * @url https://switchbrew.org/wiki/Applet_Manager_services#GetPseudoDeviceId
          */
         Result GetPseudoDeviceId(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
@@ -61,6 +65,24 @@ namespace skyline::service::am {
         Result SetGamePlayRecordingState(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
 
         /**
+         * @brief Uses the given transfer memory to setup memory for the screenshot copyright image
+         * @url https://switchbrew.org/wiki/Applet_Manager_services#InitializeApplicationCopyrightFrameBuffer
+         */
+        Result InitializeApplicationCopyrightFrameBuffer(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        /**
+         * @brief Sets the copyright image for screenshots using the buffer from InitializeApplicationCopyrightFrameBuffer
+         * @url https://switchbrew.org/wiki/Applet_Manager_services#SetApplicationCopyrightImage
+         */
+        Result SetApplicationCopyrightImage(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        /**
+         * @brief Controls the visibility of the screenshot copyright image
+         * @url https://switchbrew.org/wiki/Applet_Manager_services#SetApplicationCopyrightVisibility
+         */
+        Result SetApplicationCopyrightVisibility(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response);
+
+        /**
          * @brief Obtains a handle to the system GPU error KEvent
          * @url https://switchbrew.org/wiki/Applet_Manager_services#GetGpuErrorDetectedSystemEvent
          */
@@ -74,8 +96,11 @@ namespace skyline::service::am {
             SFUNC(0x32, IApplicationFunctions, GetPseudoDeviceId),
             SFUNC(0x42, IApplicationFunctions, InitializeGamePlayRecording),
             SFUNC(0x43, IApplicationFunctions, SetGamePlayRecordingState),
-            SFUNC(0x64, IApplicationFunctions, SetGamePlayRecordingState),
+            SFUNC(0x64, IApplicationFunctions, InitializeApplicationCopyrightFrameBuffer),
+            SFUNC(0x65, IApplicationFunctions, SetApplicationCopyrightImage),
+            SFUNC(0x66, IApplicationFunctions, SetApplicationCopyrightVisibility),
             SFUNC(0x82, IApplicationFunctions, GetGpuErrorDetectedSystemEvent)
         )
+
     };
 }

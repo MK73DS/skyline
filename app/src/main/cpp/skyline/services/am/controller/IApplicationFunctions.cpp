@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright © 2020 Skyline Team and Contributors (https://github.com/skyline-emu/)
 
+#include <common/uuid.h>
+#include <mbedtls/sha1.h>
+#include <loader/loader.h>
 #include <kernel/types/KProcess.h>
 #include <services/account/IAccountServiceForApplication.h>
 #include <services/am/storage/IStorage.h>
@@ -39,8 +42,15 @@ namespace skyline::service::am {
     }
 
     Result IApplicationFunctions::GetPseudoDeviceId(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
-        response.Push<u64>(0L);
-        response.Push<u64>(0L);
+        auto seedForPseudoDeviceId{state.loader->nacp->nacpContents.seedForPseudoDeviceId};
+        std::array<u8, 20> hashBuf{};
+
+        // On HOS the seed from control.ncap is hashed together with the device specific device ID seed
+        // for us it's enough to just hash the seed from control.nacp as it provides the same guarantees
+        if (int err{mbedtls_sha1_ret(seedForPseudoDeviceId.data(), seedForPseudoDeviceId.size(), hashBuf.data())}; err < 0)
+            throw exception("Failed to hash device ID, err: {}", err);
+
+        response.Push<UUID>(UUID::GenerateUuidV5(hashBuf));
         return {};
     }
 
@@ -49,6 +59,47 @@ namespace skyline::service::am {
     }
 
     Result IApplicationFunctions::SetGamePlayRecordingState(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
+        return {};
+    }
+
+    Result IApplicationFunctions::InitializeApplicationCopyrightFrameBuffer(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
+        i32 width{request.Pop<i32>()};
+        i32 height{request.Pop<i32>()};
+        u64 transferMemorySize{request.Pop<u64>()};
+
+        constexpr i32 MaximumFbWidth{1280};
+        constexpr i32 MaximumFbHeight{720};
+        constexpr u64 RequiredFbAlignment{0x40000};
+
+        if (width > MaximumFbWidth || height > MaximumFbHeight || !util::IsAligned(transferMemorySize, RequiredFbAlignment))
+            return result::InvalidParameters;
+
+        state.logger->Debug("Dimensions: ({}, {}) Transfer Memory Size: {}", width, height, transferMemorySize);
+
+        return {};
+    }
+
+    Result IApplicationFunctions::SetApplicationCopyrightImage(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
+        i32 x{request.Pop<i32>()};
+        i32 y{request.Pop<i32>()};
+        i32 width{request.Pop<i32>()};
+        i32 height{request.Pop<i32>()};
+
+        enum class WindowOriginMode : i32 {
+            LowerLeft,
+            UpperLeft
+        } originMode = request.Pop<WindowOriginMode>();
+
+        if (y < 0 || x < 0 || width < 1 || height < 1)
+            return result::InvalidParameters;
+
+        state.logger->Debug("Position: ({}, {}) Dimensions: ({}, {}) Origin mode: {}", x, y, width, height, static_cast<i32>(originMode));
+        return {};
+    }
+
+    Result IApplicationFunctions::SetApplicationCopyrightVisibility(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
+        u8 visiblity{request.Pop<u8>()};
+        state.logger->Debug("Visiblity: {}", visiblity);
         return {};
     }
 
