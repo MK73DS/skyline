@@ -38,6 +38,9 @@ include_directories("libraries/vkhpp/Vulkan-Headers/include") # We use base Vulk
 include_directories("libraries/pugixml/src") # We use PugiXML in header-only mode
 include_directories("libraries/frozen/include")
 
+add_subdirectory("libraries/opus")
+include_directories("libraries/opus/include")
+
 find_package(mbedtls REQUIRED CONFIG)
 
 # Perfetto SDK

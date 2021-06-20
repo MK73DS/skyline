@@ -25,3 +25,6 @@
 [submodule "app/libraries/vkhpp"]
 	path = app/libraries/vkhpp
 	url = https://github.com/KhronosGroup/Vulkan-Hpp
+[submodule "app/libraries/opus"]
+	path = app/libraries/opus
+	url = https://github.com/xiph/opus
