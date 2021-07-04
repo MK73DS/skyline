@@ -2,6 +2,7 @@
 // Copyright © 2021 Skyline Team and Contributors (https://github.com/skyline-emu/)
 
 #include <services/timesrv/common.h>
+#include <kernel/types/KProcess.h>
 
 #include "IHardwareOpusDecoder.h"
 #include "results.h"
@@ -11,15 +12,20 @@ namespace skyline::service::codec {
         return util::AlignUp(frameSize * channelCount / (OpusFullbandSampleRate / sampleRate), 0x40);
     }
 
-    IHardwareOpusDecoder::IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount) : BaseService(state, manager), sampleRate(sampleRate), channelCount(channelCount), decoderOutputBufferSize(CalculateOutBufferSize(sampleRate, channelCount, MaxFrameSizeNormal)) {
-        int result;
-        decoderState = opus_decoder_create(sampleRate, channelCount, &result);
+    IHardwareOpusDecoder::IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount, u32 workBufferSize, KHandle kWorkBuffer)
+    : BaseService(state, manager),
+      sampleRate(sampleRate),
+      channelCount(channelCount),
+      workBuffer(state.process->GetHandle<kernel::type::KTransferMemory>(kWorkBuffer)),
+      decoderOutputBufferSize(CalculateOutBufferSize(sampleRate, channelCount, MaxFrameSizeNormal)) {
+        if (workBufferSize < decoderOutputBufferSize)
+            throw OpusException("Bad memory allocation: not enought memory.");
+
+        decoderState = reinterpret_cast<OpusDecoder*>(workBuffer->kernel.ptr);
+
+        int result{opus_decoder_init(decoderState, sampleRate, channelCount)};
         if (result != OPUS_OK)
             throw OpusException(result);
-    }
-
-    IHardwareOpusDecoder::~IHardwareOpusDecoder() {
-        opus_decoder_destroy(decoderState);
     }
 
     Result IHardwareOpusDecoder::DecodeInterleavedOld(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {

@@ -7,6 +7,7 @@
 
 #include <common.h>
 #include <services/base_service.h>
+#include <kernel/types/KTransferMemory.h>
 
 namespace skyline::service::codec {
     /**
@@ -40,7 +41,8 @@ namespace skyline::service::codec {
      */
     class IHardwareOpusDecoder : public BaseService {
       private:
-        OpusDecoder *decoderState;
+        std::shared_ptr<kernel::type::KTransferMemory> workBuffer;
+        OpusDecoder *decoderState{};
         i32 sampleRate;
         i32 channelCount;
         i32 decoderOutputBufferSize;
@@ -61,8 +63,7 @@ namespace skyline::service::codec {
          * @param sampleRate The sample rate of the Opus audio data
          * @param channelCount The channel count of the Opus audio data
          */
-        IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount);
-        ~IHardwareOpusDecoder();
+        IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount, u32 workBufferSize, KHandle kWorkBuffer);
 
         /**
          * @brief Takes an OpusDataIn input buffer and a PcmDataOut output buffer.

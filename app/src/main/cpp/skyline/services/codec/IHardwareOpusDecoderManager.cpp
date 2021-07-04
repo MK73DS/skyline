@@ -17,11 +17,11 @@ namespace skyline::service::codec {
         auto sampleRate{request.Pop<i32>()};
         auto channelCount{request.Pop<i32>()};
         auto workBufferSize{request.Pop<u32>()};
-        auto workBuffer{request.Pop<KHandle>()};
+        auto workBuffer{request.copyHandles.at(0)};
 
-        state.logger->Debug("Requested Opus decoder: sample rate: {} channel count: {} work buffer handle: 0x{:X} (size: 0x{:X})", sampleRate, channelCount, workBuffer, workBufferSize);
+        state.logger->Debug("Creating Opus decoder: Sample rate: {}, Channel count: {}, Work buffer handle: 0x{:X} (Size: 0x{:X})", sampleRate, channelCount, workBuffer, workBufferSize);
 
-        manager.RegisterService(std::make_shared<IHardwareOpusDecoder>(state, manager, sampleRate, channelCount), session, response);
+        manager.RegisterService(std::make_shared<IHardwareOpusDecoder>(state, manager, sampleRate, channelCount, workBufferSize, workBuffer), session, response);
         return {};
     }
 
