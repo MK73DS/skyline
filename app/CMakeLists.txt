@@ -139,6 +139,8 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/am/storage/IStorage.cpp
         ${source_DIR}/skyline/services/am/storage/IStorageAccessor.cpp
         ${source_DIR}/skyline/services/am/applet/ILibraryAppletAccessor.cpp
+        ${source_DIR}/skyline/services/codec/IHardwareOpusDecoder.cpp
+        ${source_DIR}/skyline/services/codec/IHardwareOpusDecoderManager.cpp
         ${source_DIR}/skyline/services/hid/IHidServer.cpp
         ${source_DIR}/skyline/services/hid/IAppletResource.cpp
         ${source_DIR}/skyline/services/hid/IActiveVibrationDeviceList.cpp
@@ -198,5 +200,5 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/mmnv/IRequest.cpp
         )
 # target_precompile_headers(skyline PRIVATE ${source_DIR}/skyline/common.h) # PCH will currently break Intellisense
-target_link_libraries(skyline android perfetto fmt lz4_static tzcode oboe mbedtls::mbedcrypto)
+target_link_libraries(skyline android perfetto fmt lz4_static tzcode oboe mbedtls::mbedcrypto opus)
 target_compile_options(skyline PRIVATE -Wall -Wno-unknown-attributes -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c99-designator -Wno-reorder -Wno-missing-braces -Wno-unused-variable -Wno-unused-private-field)
