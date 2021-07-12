@@ -14,10 +14,10 @@ namespace skyline::service::codec {
     }
 
     Result IHardwareOpusDecoderManager::OpenHardwareOpusDecoder(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
-        auto sampleRate{request.Pop<i32>()};
-        auto channelCount{request.Pop<i32>()};
-        auto workBufferSize{request.Pop<u32>()};
-        auto workBuffer{request.copyHandles.at(0)};
+        i32 sampleRate{request.Pop<i32>()};
+        i32 channelCount{request.Pop<i32>()};
+        u32 workBufferSize{request.Pop<u32>()};
+        KHandle workBuffer{request.copyHandles.at(0)};
 
         state.logger->Debug("Creating Opus decoder: Sample rate: {}, Channel count: {}, Work buffer handle: 0x{:X} (Size: 0x{:X})", sampleRate, channelCount, workBuffer, workBufferSize);
 
@@ -26,8 +26,8 @@ namespace skyline::service::codec {
     }
 
     Result IHardwareOpusDecoderManager::GetWorkBufferSize(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
-        auto sampleRate{request.Pop<i32>()};
-        auto channelCount{request.Pop<i32>()};
+        i32 sampleRate{request.Pop<i32>()};
+        i32 channelCount{request.Pop<i32>()};
 
         response.Push<u32>(CalculateBufferSize(sampleRate, channelCount));
         return {};

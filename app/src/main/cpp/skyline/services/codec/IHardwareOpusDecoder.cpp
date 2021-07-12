@@ -5,23 +5,23 @@
 #include <kernel/types/KProcess.h>
 
 #include "IHardwareOpusDecoder.h"
-#include "results.h"
 
 namespace skyline::service::codec {
     size_t CalculateOutBufferSize(i32 sampleRate, i32 channelCount, i32 frameSize) {
         return util::AlignUp(frameSize * channelCount / (OpusFullbandSampleRate / sampleRate), 0x40);
     }
 
-    IHardwareOpusDecoder::IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount, u32 workBufferSize, KHandle kWorkBuffer)
-    : BaseService(state, manager),
-      sampleRate(sampleRate),
-      channelCount(channelCount),
-      workBuffer(state.process->GetHandle<kernel::type::KTransferMemory>(kWorkBuffer)),
-      decoderOutputBufferSize(CalculateOutBufferSize(sampleRate, channelCount, MaxFrameSizeNormal)) {
+    IHardwareOpusDecoder::IHardwareOpusDecoder(const DeviceState &state, ServiceManager &manager, i32 sampleRate, i32 channelCount, u32 workBufferSize, KHandle workBufferHandle)
+        : BaseService(state, manager),
+          sampleRate(sampleRate),
+          channelCount(channelCount),
+          workBuffer(state.process->GetHandle<kernel::type::KTransferMemory>(workBufferHandle)),
+          decoderOutputBufferSize(CalculateOutBufferSize(sampleRate, channelCount, MaxFrameSizeNormal)) {
         if (workBufferSize < decoderOutputBufferSize)
-            throw OpusException("Bad memory allocation: not enought memory.");
+            throw exception("Work Buffer doesn't have adequate space for Opus Decoder: 0x{:X} (Required: 0x{:X})", workBufferSize, decoderOutputBufferSize);
 
-        decoderState = reinterpret_cast<OpusDecoder*>(workBuffer->kernel.ptr);
+        // We utilize the guest-supplied work buffer for allocating the OpusDecoder object into
+        decoderState = reinterpret_cast<OpusDecoder *>(workBuffer->kernel.ptr);
 
         int result{opus_decoder_init(decoderState, sampleRate, channelCount)};
         if (result != OPUS_OK)
@@ -36,12 +36,8 @@ namespace skyline::service::codec {
         return DecodeInterleavedImpl(request, response, true);
     }
 
-    Result IHardwareOpusDecoder::DecodeInterleavedWithPerfAndResetOld(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
-        return DecodeInterleaved(session, request, response);
-    }
-
     Result IHardwareOpusDecoder::DecodeInterleaved(type::KSession &session, ipc::IpcRequest &request, ipc::IpcResponse &response) {
-        auto reset{request.Pop<bool>()};
+        bool reset{static_cast<bool>(request.Pop<u8>())};
         if (reset)
             ResetContext();
 
@@ -52,19 +48,19 @@ namespace skyline::service::codec {
         opus_decoder_ctl(decoderState, OPUS_RESET_STATE);
     }
 
-    Result IHardwareOpusDecoder::DecodeInterleavedImpl(ipc::IpcRequest &request, ipc::IpcResponse &response, bool performanceInfo) {
+    Result IHardwareOpusDecoder::DecodeInterleavedImpl(ipc::IpcRequest &request, ipc::IpcResponse &response, bool writeDecodeTime) {
         auto dataIn{request.inputBuf.at(0)};
         auto dataOut{request.outputBuf.at(0).cast<opus_int16>()};
 
         if (dataIn.size() <= sizeof(OpusDataHeader))
-            throw OpusException("Incorrect Opus packet size.");
+            throw exception("Incorrect Opus data size: 0x{:X} (Should be > 0x{:X})", dataIn.size(), sizeof(OpusDataHeader));
 
         u32 opusPacketSize{dataIn.as<OpusDataHeader>().GetPacketSize()};
-        u32 requiredInSize{static_cast<u32>(opusPacketSize + sizeof(OpusDataHeader))};
+        i32 requiredInSize{static_cast<i32>(opusPacketSize + sizeof(OpusDataHeader))};
         if (opusPacketSize > MaxInputBufferSize || dataIn.size() < requiredInSize)
-            throw OpusException(OPUS_BUFFER_TOO_SMALL);
+            throw exception("Opus packet size mismatch: 0x{:X} (Requested: 0x{:X})", dataIn.size() - sizeof(OpusDataHeader), opusPacketSize);
 
-        // Subtract header from the input buffer to get the opus packet
+        // Skip past the header in the input buffer to get the Opus packet
         auto sampleDataIn = dataIn.subspan(sizeof(OpusDataHeader));
 
         auto perfTimer{timesrv::TimeSpanType::FromNanoseconds(util::GetTimeNs())};
@@ -74,10 +70,9 @@ namespace skyline::service::codec {
         if (decodedCount < 0)
             throw OpusException(decodedCount);
 
-        // Decoding is successful, decoded data size is opus packet size + header
-        response.Push(requiredInSize);
+        response.Push(requiredInSize); // Decoded data size is equal to opus packet size + header
         response.Push(decodedCount);
-        if (performanceInfo)
+        if (writeDecodeTime)
             response.Push<u64>(perfTimer.Microseconds());
 
         return {};
