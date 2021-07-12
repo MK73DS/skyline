@@ -102,8 +102,10 @@ RescaleClock:
     MOVK X0, #29108, LSL #16
     MOVK X0, #23236, LSL #32
     MOVK X0, #2684, LSL #48
-    MRS X1, CNTFRQ_EL0
-    LSR X1, X1, #5
+    /*MRS X1, CNTFRQ_EL0
+    LSR X1, X1, #5*/
+    MOV X1, #0x65D4
+    MOVK X1, #0xC, lsl #16
     UMULH X1, X1, X0
     LSR X1, X1, #7
     MRS X0, CNTVCT_EL0

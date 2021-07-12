@@ -86,7 +86,8 @@ class EmulationActivity : AppCompatActivity(), SurfaceHolder.Callback, View.OnTo
     private external fun setSurface(surface : Surface?) : Boolean
 
     var fps : Int = 0
-    var frametime : Float = 0.0f
+    var averageFrametime : Float = 0.0f
+    var averageFrametimeDeviation : Float = 0.0f
 
     /**
      * Writes the current performance statistics into [fps] and [frametime] fields
@@ -204,7 +205,7 @@ class EmulationActivity : AppCompatActivity(), SurfaceHolder.Callback, View.OnTo
                 postDelayed(object : Runnable {
                     override fun run() {
                         updatePerformanceStatistics()
-                        text = "$fps FPS\n${frametime}ms"
+                        text = "$fps FPS\n${"%.1f".format(averageFrametime)}±${"%.2f".format(averageFrametimeDeviation)}ms"
                         postDelayed(this, 250)
                     }
                 }, 250)
@@ -212,7 +213,10 @@ class EmulationActivity : AppCompatActivity(), SurfaceHolder.Callback, View.OnTo
         }
 
         @Suppress("DEPRECATION") val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display!! else windowManager.defaultDisplay
-        display?.supportedModes?.maxByOrNull { it.refreshRate + (it.physicalHeight * it.physicalWidth) }?.let { window.attributes.preferredDisplayModeId = it.modeId }
+        if (settings.maxRefreshRate)
+            display?.supportedModes?.maxByOrNull { it.refreshRate * it.physicalHeight * it.physicalWidth }?.let { window.attributes.preferredDisplayModeId = it.modeId }
+        else
+            display?.supportedModes?.minByOrNull { abs(it.refreshRate - 60f) }?.let { window.attributes.preferredDisplayModeId = it.modeId }
 
         binding.gameView.setOnTouchListener(this)
 
@@ -372,7 +376,7 @@ class EmulationActivity : AppCompatActivity(), SurfaceHolder.Callback, View.OnTo
                             is AxisGuestEvent -> {
                                 value = guestEvent.value(value)
                                 value = if (polarity) abs(value) else -abs(value)
-                                value = if (guestEvent.axis == AxisId.LX || guestEvent.axis == AxisId.RX) value else -value // TODO: Test this
+                                value = if (guestEvent.axis == AxisId.LX || guestEvent.axis == AxisId.RX) value else -value
 
                                 setAxisValue(guestEvent.id, guestEvent.axis.ordinal, (value * Short.MAX_VALUE).toInt())
                             }
@@ -453,5 +457,15 @@ class EmulationActivity : AppCompatActivity(), SurfaceHolder.Callback, View.OnTo
     @Suppress("unused")
     fun clearVibrationDevice(index : Int) {
         vibrators[index]?.cancel()
+    }
+
+    /**
+     * @return A version code in Vulkan's format with 14-bit patch + 10-bit major and minor components
+     */
+    @ExperimentalUnsignedTypes
+    @Suppress("unused")
+    fun getVersionCode() : Int {
+        val (major, minor, patch) = BuildConfig.VERSION_NAME.split('.').map { it.toUInt() }
+        return ((major shl 22) or (minor shl 12) or (patch)).toInt()
     }
 }

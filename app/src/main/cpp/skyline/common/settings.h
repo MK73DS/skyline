@@ -12,8 +12,10 @@ namespace skyline {
     class Settings {
       public:
         Logger::LogLevel logLevel; //!< The minimum level that logs need to be for them to be printed
-        bool operationMode; //!< If the emulated Switch should be handheld or docked
         std::string username; //!< The name set by the user to be supplied to the guest
+        bool operationMode; //!< If the emulated Switch should be handheld or docked
+        bool forceTripleBuffering; //!< If the presentation engine should always triple buffer even if the swapchain supports double buffering
+        bool disableFrameThrottling; //!< Allow the guest to submit frames without any blocking calls
 
         /**
          * @param fd An FD to the preference XML file

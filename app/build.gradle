@@ -11,11 +11,11 @@ android {
     defaultConfig {
         applicationId "skyline.emu"
 
-        minSdkVersion 26
+        minSdkVersion 29
         targetSdkVersion 30
 
         versionCode 3
-        versionName "0.3"
+        versionName "0.0.3"
 
         ndk {
             abiFilters "arm64-v8a"
@@ -71,26 +71,56 @@ android {
         }
     }
 
+    /* Vulkan Validation Layers */
+    sourceSets {
+        debug {
+            main {
+                jniLibs {
+                    srcDir "$buildDir/generated/vulkan_layers"
+                }
+            }
+        }
+    }
+
+    /* Android Assets */
     aaptOptions {
         ignoreAssetsPattern "*.md"
     }
 }
 
-dependencies {
-    /* Filetrees */
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+/**
+ * We just want VK_LAYER_KHRONOS_validation in the APK while NDK contains several other legacy layers
+ * This task copies shared objects associated with that layer into a folder from where JNI can use it
+ */
+task setupValidationLayer(type: Copy) {
+    doFirst {
+        def folder = new File("$buildDir/generated/vulkan_layers")
+        if (!folder.exists()) {
+            folder.mkdirs() // We need to recursively create all directories as the copy requires the output directory to exist
+        }
+    }
+    from("${android.ndkDirectory}/sources/third_party/vulkan/src/build-android/jniLibs") {
+        include "*/libVkLayer_khronos_validation.so"
+    }
+    into "$buildDir/generated/vulkan_layers"
+}
 
+afterEvaluate {
+    preDebugBuild.dependsOn setupValidationLayer
+}
+
+dependencies {
     /* Google  */
-    implementation "androidx.core:core-ktx:1.3.2"
-    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation "androidx.core:core-ktx:1.6.0"
+    implementation 'androidx.appcompat:appcompat:1.3.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.preference:preference-ktx:1.1.1'
-    implementation 'com.google.android.material:material:1.3.0'
+    implementation 'com.google.android.material:material:1.4.0'
     implementation 'androidx.documentfile:documentfile:1.0.1'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
-    implementation 'androidx.fragment:fragment-ktx:1.3.2'
+    implementation 'androidx.fragment:fragment-ktx:1.3.5'
     implementation "com.google.dagger:hilt-android:$hilt_version"
     kapt "com.google.dagger:hilt-android-compiler:$hilt_version"
     implementation 'com.google.android:flexbox:2.0.1'
@@ -100,7 +130,4 @@ dependencies {
 
     /* Other Java */
     implementation 'info.debatty:java-string-similarity:2.0.0'
-
-    /* NDK */
-    implementation files("libraries/mbedtls.aar")
 }

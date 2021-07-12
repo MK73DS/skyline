@@ -16,32 +16,54 @@ if (uppercase_CMAKE_BUILD_TYPE STREQUAL "RELEASE")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif ()
 
+# {fmt}
 add_subdirectory("libraries/fmt")
 
+# TzCode
 add_subdirectory("libraries/tzcode")
 target_compile_options(tzcode PRIVATE -Wno-everything)
 
+# Oboe
 add_subdirectory("libraries/oboe")
 include_directories("libraries/oboe/include")
 
+# LZ4
 set(LZ4_BUILD_CLI OFF CACHE BOOL "Build LZ4 CLI" FORCE)
 set(LZ4_BUILD_LEGACY_LZ4C OFF CACHE BOOL "Build lz4c progam with legacy argument support" FORCE)
 add_subdirectory("libraries/lz4/build/cmake")
 include_directories("libraries/lz4/lib")
 
+# Vulkan + Vulkan-Hpp
+add_compile_definitions(VK_USE_PLATFORM_ANDROID_KHR) # We want all the Android-specific structures to be defined
 add_compile_definitions(VULKAN_HPP_NO_SPACESHIP_OPERATOR) # libcxx doesn't implement operator<=> for std::array which breaks this
 add_compile_definitions(VULKAN_HPP_NO_STRUCT_CONSTRUCTORS) # We want to use designated initializers in Vulkan-Hpp
-add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1) # We use the dynamic loader rather than the static one
+add_compile_definitions(VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1) # We use the dynamic loader rather than the static one to avoid an additional level of indirection
 include_directories("libraries/vkhpp")
 include_directories("libraries/vkhpp/Vulkan-Headers/include") # We use base Vulkan headers from this to ensure version parity with Vulkan-Hpp
 
-include_directories("libraries/pugixml/src") # We use PugiXML in header-only mode
+# Vulkan Memory Allocator
+include_directories("libraries/vkma/include")
+add_library(vkma STATIC libraries/vkma.cpp)
+target_compile_options(vkma PRIVATE -Wno-everything)
+
+# PugiXML (Header-only mode)
+include_directories("libraries/pugixml/src")
+
+# Frozen
 include_directories("libraries/frozen/include")
 
+# MbedTLS
+set(ENABLE_TESTING OFF CACHE BOOL "Build mbed TLS tests." FORCE)
+set(ENABLE_PROGRAMS OFF CACHE BOOL "Build mbed TLS programs." FORCE)
+set(UNSAFE_BUILD ON CACHE BOOL "Allow unsafe builds. These builds ARE NOT SECURE." FORCE)
+add_subdirectory("libraries/mbedtls")
+include_directories("libraries/mbedtls/include")
+
+# Opus
 add_subdirectory("libraries/opus")
 include_directories("libraries/opus/include")
 
-find_package(mbedtls REQUIRED CONFIG)
+
 
 # Perfetto SDK
 include_directories(libraries/perfetto/sdk)
@@ -75,8 +97,11 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/audio/track.cpp
         ${source_DIR}/skyline/audio/resampler.cpp
         ${source_DIR}/skyline/audio/adpcm_decoder.cpp
+        ${source_DIR}/skyline/gpu.cpp
+        ${source_DIR}/skyline/gpu/memory_manager.cpp
+        ${source_DIR}/skyline/gpu/command_scheduler.cpp
+        ${source_DIR}/skyline/gpu/texture/texture.cpp
         ${source_DIR}/skyline/gpu/presentation_engine.cpp
-        ${source_DIR}/skyline/gpu/texture.cpp
         ${source_DIR}/skyline/soc/gmmu.cpp
         ${source_DIR}/skyline/soc/host1x/syncpoint.cpp
         ${source_DIR}/skyline/soc/gm20b/gpfifo.cpp
@@ -106,7 +131,6 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/vfs/ticket.cpp
         ${source_DIR}/skyline/services/serviceman.cpp
         ${source_DIR}/skyline/services/base_service.cpp
-        ${source_DIR}/skyline/services/common/parcel.cpp
         ${source_DIR}/skyline/services/sm/IUserInterface.cpp
         ${source_DIR}/skyline/services/fatalsrv/IService.cpp
         ${source_DIR}/skyline/services/audio/IAudioOutManager.cpp
@@ -169,12 +193,13 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/nvdrv/devices/nvhost_channel.cpp
         ${source_DIR}/skyline/services/nvdrv/devices/nvhost_as_gpu.cpp
         ${source_DIR}/skyline/services/nvdrv/devices/nvhost_syncpoint.cpp
+        ${source_DIR}/skyline/services/hosbinder/parcel.cpp
         ${source_DIR}/skyline/services/hosbinder/IHOSBinderDriver.cpp
         ${source_DIR}/skyline/services/hosbinder/GraphicBufferProducer.cpp
         ${source_DIR}/skyline/services/visrv/IDisplayService.cpp
         ${source_DIR}/skyline/services/visrv/IApplicationDisplayService.cpp
         ${source_DIR}/skyline/services/visrv/IManagerDisplayService.cpp
-        ${source_DIR}/skyline/services/visrv/IManagerRootService.cpp
+        ${source_DIR}/skyline/services/visrv/IRootService.cpp
         ${source_DIR}/skyline/services/visrv/ISystemDisplayService.cpp
         ${source_DIR}/skyline/services/pl/IPlatformServiceManager.cpp
         ${source_DIR}/skyline/services/aocsrv/IAddOnContentManager.cpp
@@ -200,5 +225,5 @@ add_library(skyline SHARED
         ${source_DIR}/skyline/services/mmnv/IRequest.cpp
         )
 # target_precompile_headers(skyline PRIVATE ${source_DIR}/skyline/common.h) # PCH will currently break Intellisense
-target_link_libraries(skyline android perfetto fmt lz4_static tzcode oboe mbedtls::mbedcrypto opus)
+target_link_libraries(skyline android perfetto fmt lz4_static tzcode oboe vkma mbedcrypto opus)
 target_compile_options(skyline PRIVATE -Wall -Wno-unknown-attributes -Wno-c++20-extensions -Wno-c++17-extensions -Wno-c99-designator -Wno-reorder -Wno-missing-braces -Wno-unused-variable -Wno-unused-private-field)
