@@ -21,6 +21,7 @@
 #include <sstream>
 #include <memory>
 #include <compare>
+#include <variant>
 #include <sys/mman.h>
 #include <fmt/format.h>
 #include <frozen/unordered_map.h>
@@ -119,13 +120,9 @@ namespace skyline {
     };
 
     namespace constant {
-        // Display
-        constexpr u16 HandheldResolutionW{1280}; //!< The width component of the handheld resolution
-        constexpr u16 HandheldResolutionH{720}; //!< The height component of the handheld resolution
-        constexpr u16 DockedResolutionW{1920}; //!< The width component of the docked resolution
-        constexpr u16 DockedResolutionH{1080}; //!< The height component of the docked resolution
         // Time
         constexpr u64 NsInSecond{1000000000}; //!< The amount of nanoseconds in a second
+        constexpr u64 NsInMillisecond{1000000}; //!< The amount of nanoseconds in a millisecond
         constexpr u64 NsInDay{86400000000000UL}; //!< The amount of nanoseconds in a day
     }
 
@@ -191,7 +188,7 @@ namespace skyline {
          * @brief A way to implicitly convert a pointer to uintptr_t and leave it unaffected if it isn't a pointer
          */
         template<typename T>
-        T PointerValue(T item) {
+        constexpr T PointerValue(T item) {
             return item;
         }
 
@@ -204,7 +201,7 @@ namespace skyline {
          * @brief A way to implicitly convert an integral to a pointer, if the return type is a pointer
          */
         template<typename Return, typename T>
-        Return ValuePointer(T item) {
+        constexpr Return ValuePointer(T item) {
             if constexpr (std::is_pointer<Return>::value)
                 return reinterpret_cast<Return>(item);
             else
@@ -374,7 +371,7 @@ namespace skyline {
          * @param nullTerminated If true and the string is null-terminated, a view of it will be returned (not including the null terminator itself), otherwise the entire span will be returned as a string view
          */
         constexpr std::string_view as_string(bool nullTerminated = false) {
-            return std::string_view(reinterpret_cast<char *>(span::data()), nullTerminated ? (std::find(span::begin(), span::end(), 0) - span::begin()) : span::size_bytes());
+            return std::string_view(reinterpret_cast<const char *>(span::data()), nullTerminated ? (std::find(span::begin(), span::end(), 0) - span::begin()) : span::size_bytes());
         }
 
         template<typename Out, size_t OutExtent = std::dynamic_extent>
@@ -450,12 +447,20 @@ namespace skyline {
     span(const Container &) -> span<const typename Container::value_type>;
 
     /**
+     * @brief A deduction guide for overloads required for std::visit with std::variant
+     */
+    template<class... Ts>
+    struct VariantVisitor : Ts ... { using Ts::operator()...; };
+    template<class... Ts> VariantVisitor(Ts...) -> VariantVisitor<Ts...>;
+
+    /**
      * @brief A wrapper around writing logs into a log file and logcat using Android Log APIs
      */
     class Logger {
       private:
-        std::ofstream logFile; //!< An output stream to the log file
         std::mutex mutex; //!< Synchronizes all output I/O to ensure there are no races
+        std::ofstream logFile; //!< An output stream to the log file
+        u64 start; //!< A timestamp in milliseconds for when the logger was started, this is used as the base for all log timestamps
 
       public:
         enum class LogLevel {
@@ -483,11 +488,6 @@ namespace skyline {
          * @brief Update the tag in log messages with a new thread name
          */
         static void UpdateTag();
-
-        /**
-         * @brief Writes a header, should only be used for emulation starting and ending
-         */
-        void WriteHeader(const std::string &str);
 
         void Write(LogLevel level, const std::string &str);
 
